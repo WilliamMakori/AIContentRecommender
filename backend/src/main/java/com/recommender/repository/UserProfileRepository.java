@@ -3,21 +3,31 @@ package com.recommender.repository;
 
 // we'll use the class from the userprofile model 
 
-import com.recommended.UserProfile; 
+import com.recommender.UserProfile; 
 // not sure what the rest of this is or how it's used
 // object mpper is used to map java objects to 
 
 import com.fasterxml.jackson.databind.ObjectMapper; 
+// Object mapper converts Java objects to JSON and back, this is the format that APIs use to send data back and forth like
+// basically its used for formatting responses
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient; 
 import software.amazon.awssdk.services.dynamodb.model.*; 
+// the line above means that we import all the classes in the model package of the dynamodb library, this includes the put item request, get item request, delete item request and etc, we need these to interact with the database and perform operations like adding, retrieving and deleting items from the database
 // what is a dynamodb client, what is a dynamodb model and why does the statement end with a .*
+
 import java.util.HashMap; 
 import java.util.Map; 
 
 public class UserProfileRepository{
-    // final variables are 
+    // final variables are variables that can be assigned once and never changed after that
+    // we mark the two variables below as final as a safety lock
     private final DynamoDbClient dynamoDbClient; 
-    // what is a client in a dynamodb client
+    // what is a client in a dynamodb client, a client is an object that knows how to talk to a specific service
+    // in this case the dynamodb client knows how to talk to the service and is the main connection to DynamoDB
+    /*
+    everytime i want to read or write data, you use this client to make the call
+
+    */
     private final ObjectMapper objectMapper; 
     private static final String TABLE_NAME = "user-profiles";
 
@@ -77,7 +87,7 @@ public class UserProfileRepository{
 
         GetItemRequest request = GetItemRequest.builder().tableName(TABLE_NAME).key(key).build();
 
-        GetItemResponse response = dynamoDBClient.getItem(request); 
+        GetItemResponse response = dynamoDbClient.getItem(request); 
 
         if(!response.hasItem()){
             return null;
