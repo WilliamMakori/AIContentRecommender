@@ -99,4 +99,21 @@ public class UserProfileRepository{
 
         return profile;
     }
+
+    // deleting a user profile from DynamoDB
+    public void delete(String userId){
+        // we create a new HashMap variable
+        // why do we need this? we use the id as the key in the key value pair and the rest of the contents of the 
+        // and we pick a attributevalue to use to store the rest
+        // use the created variable to search for and remove the value from the Database once we find it
+
+        Map<String,AttributeValue> key = new HashMap<>();
+        key.put("userId", AttributeValue.builder().s(userId).build()); 
+        
+        DeleteItemRequest request = DeleteItemRequest.builder().tableName(TABLE_NAME).key(key).build();
+
+        dynamoDbClient.deleteItem(request); 
+
+    
+    }
 }
