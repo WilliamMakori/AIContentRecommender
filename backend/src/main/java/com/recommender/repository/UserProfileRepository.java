@@ -3,7 +3,7 @@ package com.recommender.repository;
 
 // we'll use the class from the userprofile model 
 
-import com.recommender.UserProfile; 
+import com.recommender.model.UserProfile; 
 // not sure what the rest of this is or how it's used
 // object mpper is used to map java objects to 
 
@@ -15,7 +15,7 @@ import software.amazon.awssdk.services.dynamodb.model.*;
 // the line above means that we import all the classes in the model package of the dynamodb library, this includes the put item request, get item request, delete item request and etc, we need these to interact with the database and perform operations like adding, retrieving and deleting items from the database
 // what is a dynamodb client, what is a dynamodb model and why does the statement end with a .*
 
-import java.util.HashMap; 
+import java.util.HashMap;    
 import java.util.Map; 
 
 public class UserProfileRepository{

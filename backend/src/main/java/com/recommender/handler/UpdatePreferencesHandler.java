@@ -6,7 +6,6 @@ import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyRequestEvent;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyResponseEvent;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.recommender.model.UserProfile;
 import com.recommender.repository.RecommendationRepository;
 import com.recommender.repository.UserProfileRepository;
 import com.recommender.service.BedrockService;
@@ -14,21 +13,23 @@ import com.recommender.service.RecommendationService;
 import software.amazon.awssdk.services.bedrockruntime.BedrockRuntimeClient;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
-public class WatchHistoryHandler implements
+public class UpdatePreferencesHandler implements
     RequestHandler<APIGatewayProxyRequestEvent, APIGatewayProxyResponseEvent> {
 
     private final RecommendationService recommendationService;
-    private final UserProfileRepository userProfileRepository;
     private final ObjectMapper objectMapper;
 
-    public WatchHistoryHandler() {
+    public UpdatePreferencesHandler() {
         DynamoDbClient dynamoDbClient = DynamoDbClient.builder().build();
         BedrockRuntimeClient bedrockClient = BedrockRuntimeClient.builder().build();
 
-        this.userProfileRepository = new UserProfileRepository(dynamoDbClient);
+        UserProfileRepository userProfileRepository =
+            new UserProfileRepository(dynamoDbClient);
         RecommendationRepository recommendationRepository =
             new RecommendationRepository(dynamoDbClient);
         BedrockService bedrockService =
@@ -48,72 +49,49 @@ public class WatchHistoryHandler implements
             APIGatewayProxyRequestEvent event,
             Context context) {
 
-        context.getLogger().log("WatchHistory called with method: "
-            + event.getHttpMethod());
+        context.getLogger().log("UpdatePreferences called");
 
         try {
+            // Step 1 — extract userId from the URL path
             String userId = event.getPathParameters().get("userId");
             if (userId == null || userId.isEmpty()) {
                 return buildResponse(400, "{\"error\": \"userId is required\"}");
             }
 
-            String httpMethod = event.getHttpMethod();
-
-            // GET — return the user's watch history
-            if ("GET".equals(httpMethod)) {
-                return handleGetWatchHistory(userId);
+            // Step 2 — parse the request body to get the new genres
+            String body = event.getBody();
+            if (body == null || body.isEmpty()) {
+                return buildResponse(400, "{\"error\": \"Request body is required\"}");
             }
 
-            // POST — add a new title to watch history
-            if ("POST".equals(httpMethod)) {
-                return handleAddToWatchHistory(userId, event.getBody());
+            JsonNode bodyNode = objectMapper.readTree(body);
+            JsonNode genresNode = bodyNode.get("genres");
+
+            if (genresNode == null || !genresNode.isArray()) {
+                return buildResponse(400, "{\"error\": \"genres array is required\"}");
             }
 
-            return buildResponse(405, "{\"error\": \"Method not allowed\"}");
+            // Step 3 — convert the JSON array into a Java List
+            List<String> newGenres = new ArrayList<>();
+            for (JsonNode genre : genresNode) {
+                newGenres.add(genre.asText());
+            }
+
+            if (newGenres.isEmpty()) {
+                return buildResponse(400, "{\"error\": \"genres cannot be empty\"}");
+            }
+
+            // Step 4 — update the user's preferences
+            recommendationService.updatePreferences(userId, newGenres);
+
+            return buildResponse(200,
+                "{\"message\": \"Preferences updated successfully\"}");
 
         } catch (Exception e) {
             context.getLogger().log("Error: " + e.getMessage());
             return buildResponse(500,
                 "{\"error\": \"Internal server error: " + e.getMessage() + "\"}");
         }
-    }
-
-    // Handle GET — fetch and return the user's watch history
-    private APIGatewayProxyResponseEvent handleGetWatchHistory(
-            String userId) throws Exception {
-
-        UserProfile profile = userProfileRepository.findById(userId);
-        if (profile == null) {
-            return buildResponse(404, "{\"error\": \"User not found\"}");
-        }
-
-        String responseBody = objectMapper.writeValueAsString(
-            Map.of("watchHistory", profile.getWatchHistory())
-        );
-
-        return buildResponse(200, responseBody);
-    }
-
-    // Handle POST — add a title to the user's watch history
-    private APIGatewayProxyResponseEvent handleAddToWatchHistory(
-            String userId, String body) throws Exception {
-
-        if (body == null || body.isEmpty()) {
-            return buildResponse(400, "{\"error\": \"Request body is required\"}");
-        }
-
-        JsonNode bodyNode = objectMapper.readTree(body);
-        JsonNode titleNode = bodyNode.get("title");
-
-        if (titleNode == null || titleNode.asText().isEmpty()) {
-            return buildResponse(400, "{\"error\": \"title is required\"}");
-        }
-
-        String title = titleNode.asText();
-        recommendationService.addToWatchHistory(userId, title);
-
-        return buildResponse(200,
-            "{\"message\": \"Added " + title + " to watch history\"}");
     }
 
     private APIGatewayProxyResponseEvent buildResponse(int statusCode, String body) {
